@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DropboxSignController } from './dropbox-sign.controller';
-import { DropboxSignService } from './dropbox-sign.service';
+import { DropboxSignService, SignatureService } from './dropbox-sign.service';
 import { Signer } from './signer.entity';
 
 @Module({
@@ -28,6 +28,6 @@ import { Signer } from './signer.entity';
     TypeOrmModule.forFeature([Signer]),
   ],
   controllers: [DropboxSignController],
-  providers: [DropboxSignService],
+  providers: [DropboxSignService, SignatureService],
 })
 export class DropboxSignModule {}

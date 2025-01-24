@@ -20,3 +20,16 @@ export class DropboxSignService {
     return await this.signerRepository.save(signer);
   }
 }
+
+@Injectable()
+export class SignatureService {
+  private signatureId: string | null = null;
+
+  setSignatureId(id: string): void {
+    this.signatureId = id;
+  }
+
+  getSignatureId(): string | null {
+    return this.signatureId;
+  }
+}

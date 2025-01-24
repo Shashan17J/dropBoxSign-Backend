@@ -10,9 +10,13 @@ import {
   Response,
   UseInterceptors,
 } from '@nestjs/common';
-import { SignatureRequestApi, SubSigningOptions } from '@dropbox/sign';
+import {
+  EmbeddedApi,
+  SignatureRequestApi,
+  SubSigningOptions,
+} from '@dropbox/sign';
 import { ConfigService } from '@nestjs/config';
-import { DropboxSignService } from './dropbox-sign.service';
+import { DropboxSignService, SignatureService } from './dropbox-sign.service';
 import { AnyFilesInterceptor } from '@nestjs/platform-express';
 
 @Controller()
@@ -20,6 +24,7 @@ export class DropboxSignController {
   constructor(
     private readonly configService: ConfigService, // Access env var
     private readonly dropboxSignService: DropboxSignService, // database operations service
+    private readonly signatureService: SignatureService, //for storing and retriving the sigtnature Id
   ) {}
 
   @Get('/')
@@ -65,11 +70,18 @@ export class DropboxSignController {
         },
       ];
 
-      await dropbox.signatureRequestSendWithTemplate({
+      const resp = await dropbox.signatureRequestCreateEmbeddedWithTemplate({
         templateIds: [templateId],
+        clientId: this.configService.get('DROPBOX_SIGN_CLIENT_ID'),
         subject: 'Purchase Agreement',
         message: 'Please Read and Sign this Rooftop Air Right Agreement',
         signers: signers,
+        customFields: [
+          {
+            name: 'amount',
+            value: '40 $',
+          },
+        ],
         signingOptions: {
           draw: true,
           type: true,
@@ -78,6 +90,18 @@ export class DropboxSignController {
         },
         testMode: true,
       });
+
+      const signatureId =
+        resp.body.signatureRequest?.signatures[0]?.signatureId;
+
+      const signatureRequest = resp.body.signatureRequest;
+
+      // extracting the required details
+      const title = signatureRequest?.title;
+      const message = signatureRequest?.message;
+      const requesterEmailAddress = signatureRequest?.requesterEmailAddress;
+
+      this.signatureService.setSignatureId(signatureId);
 
       try {
         await this.dropboxSignService.saveSignerData({
@@ -93,13 +117,48 @@ export class DropboxSignController {
 
       return {
         message: 'Document sent for signing',
+        signerData: {
+          title,
+          message,
+          requesterEmailAddress,
+        },
       };
+
+      // const embeddedApi = new EmbeddedApi();
+      // embeddedApi.username = this.configService.get('DROPBOX_SIGN_API_KEY');
+
+      // const embeddedResp = await embeddedApi.embeddedSignUrl(signatureId);
+      // return {
+      //   message: 'Document sent for signing',
+      //   embeddedUrl: embeddedResp.body.embedded?.signUrl,
+      //   expiresAt: embeddedResp.body.embedded?.expiresAt,
+      // };
     } catch (error) {
       // console.error(
       //   'Error processing the sign request:',
       //   error?.response?.data,
       // );
       throw new Error('Invalid sign request data');
+    }
+  }
+
+  @Get('/embedded-url')
+  async embeddedURl(@Request() req): Promise<any> {
+    try {
+      const signatureId = this.signatureService.getSignatureId();
+
+      const embeddedApi = new EmbeddedApi();
+      embeddedApi.username = this.configService.get('DROPBOX_SIGN_API_KEY');
+
+      const resp = await embeddedApi.embeddedSignUrl(signatureId);
+
+      return {
+        embeddedUrl: resp.body.embedded?.signUrl,
+        expiresAt: resp.body.embedded?.expiresAt,
+      };
+    } catch (error) {
+      // console.log(error);
+      throw error;
     }
   }
 }
