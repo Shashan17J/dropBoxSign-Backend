@@ -121,6 +121,8 @@ export class DropboxSignController {
           title,
           message,
           requesterEmailAddress,
+          emailAddress,
+          name,
         },
       };
 
