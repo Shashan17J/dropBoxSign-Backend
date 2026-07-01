@@ -1,0 +1,83 @@
+  @Post('/sign')
+  async signDoc(@Request() req): Promise<any> {
+    try {
+      const { signers, templateId } = req.body;
+      if (!signers || !templateId) {
+        throw new Error('Invalid request body: Missing required fields');
+      }
+
+      if (!Array.isArray(signers) || signers.length === 0) {
+        throw new Error(
+          'Invalid request body: Signers must be a non-empty array',
+        );
+      }
+
+      // Ensure all signers have the required fields
+      for (const signer of signers) {
+        if (!signer.role || !signer.name || !signer.emailAddress) {
+          throw new Error(
+            'Invalid request body: Each signer must have role, name, and emailAddress',
+          );
+        }
+      }
+
+      const dropbox = new SignatureRequestApi();
+      dropbox.username = this.configService.get('DROPBOX_SIGN_API_KEY');
+
+      console.log(req.body);
+
+      const formattedSigners: SubSignatureRequestTemplateSigner[] = signers.map(
+        (signer) => ({
+          role: signer.role,
+          name: signer.name,
+          emailAddress: signer.emailAddress,
+        }),
+      );
+
+      console.log('Signers:', formattedSigners);
+
+      await dropbox.signatureRequestSendWithTemplate({
+        // templateIds: [this.configService.get('DROPBOX_SIGN_TEMPLATE_KEY')],
+        templateIds: [templateId],
+        subject: 'Purchase Agreement',
+        message: 'Please Read and Sign this Rooftop Air Right Agreement',
+        signers: formattedSigners, // Use the dynamically created signers array
+        signingOptions: {
+          draw: true,
+          type: true,
+          upload: true,
+          phone: false,
+          defaultType: SubSigningOptions.DefaultTypeEnum.Draw,
+        },
+        testMode: true,
+      });
+
+      // Optionally, save signer data to the database
+      //   await this.dropboxSignService.saveSignerData(signers);
+
+      return {
+        message: 'Document sent for signing and data saved to the database.',
+      };
+    } catch (error) {
+      console.error('Error processing the sign request:', error);
+      throw new Error('Invalid sign request data');
+    }
+  }
+
+
+
+{
+    "signers": [
+        {
+            "role": "SELLER",
+            "name": "Shashank",
+            "emailAddress": "shashank.jangid17@gmail.com"
+        },
+        {
+            "role": "BUYER",
+            "name": "John Doe",
+            "emailAddress": "john.doe@example.com"
+        }
+    ],
+    "templateId": "40d14090fa10aff92913cf57f433ce5cd051f415"
+}
